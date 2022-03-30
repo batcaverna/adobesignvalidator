@@ -1,3 +1,178 @@
+##### What are the Reference Codes?
+
+The Reference Codes of the Brazilian Digital Signature Standard constitute
+the reference implementation of the standards pertinent to the regulation of
+digital signatures within the scope of the Brazilian Public Key Infrastructure
+(ICP-Brazil). Its target audience are application and platform providers
+that wish to support ICP-Brasil digital signatures. The Reference Codes
+Codes aim to promote greater interoperability between such applications and facilitate
+and facilitate the implementation of the standards, while simultaneously offering means to improve the set of standards itself.
+improving the standards set itself.
+
+##### What is its function?
+
+To create and verify signatures with ICP-Brasil certificates according to the document
+[DOC-ICP-15](https://www.gov.br/iti/pt-br/centrais-de-conteudo/doc-icp-15-v-3-0-visao-geral-sobre-assin-dig-na-icp-brasil-pdf),
+regulated by the [National Institute of Information
+Information Technology](https://gov.br/iti) (ITI).
+
+##### How are they organized?
+
+The main characteristic that permeates the Reference Codes is the strong use of
+of reflection, a concept related to metaprogramming, to elaborate a component-oriented
+component orientation, allowing modularization of some parts of the code base.
+of the code base. More details about this approach can be read [in this
+monograph](https://repositorio.ufsc.br/handle/123456789/184160).
+
+The codebase is programmed in Java and follows the
+[Maven](https://maven.apache.org), so the source code is at
+`codes-reference-core/src/main/java`. Unit tests, located at
+`codigos-de-referencia-core/src/test/java`, can be run with `mvn
+test`. The `mvn` commands are usually run in the root folder of the source code.
+
+Execution of the `mvn package` command automatically generates the documentation for the
+documentation, located in the `docs` folder, and two deliverables in the form of
+WAR (_web application archive_) files, both in the `target` folder:
+
+* The [Conformance Verifier](https://verificador.iti.gov.br), verifier
+  verifier of ICP-Brasil digital signatures, whose execution is started
+  from the `IndexServlet` class. As this system is used in production
+  its documentation is detailed below.
+* The [Reference Signer](https://pbad.labsec.ufsc.br/signer-hom), which
+  execution is started from the `SignerServlet` class.
+
+##### How to install and run Compliance Verifier?
+
+To run correctly, Verifier requires a minimum of 256 MB RAM and an
+RAM and an x86-64 architecture microprocessor with two physical processing cores.
+processing cores. However, the performance of the Verifier will be
+directly proportional to the resources available on the machine, especially when
+checking multiple files simultaneously. Therefore, **8 GB of
+recommended **8 GB RAM and eight physical processing cores** for acceptable performance.
+acceptable performance.
+
+The Verifier package takes up about **35 MB** on disk. In addition, digital certificate
+In addition, digital certificate files and revoked certificate lists (CRLs) are
+stored locally to avoid repeated file transfers,
+and thus evaluate digital signatures more quickly. In this context, the folder
+folder of choice is `/tmp/compliance-checker`, and it is suggested that about **1 GB
+of disk space** should be reserved for the extended use of this functionality.
+
+The Reference Codes require **Java 15** (OpenJDK, Eclipse J9 etc.)
+running under any GNU/Linux distribution (Debian, openSUSE etc.) in order to
+run correctly. As Verifier is a web application, an
+application server that implements the **Jakarta Servlet 5.0** standard (Apache
+Tomcat 10.0+, GlassFish 6+) is also required.
+
+The [Homologation Server](https://pbad.labsec.ufsc.br/verifier-hom) of the
+Verifier uses **Ubuntu 20.04 LTS, OpenJDK 15 and [Apache Tomcat
+10](https://tomcat.apache.org)**, for example. However, you can run
+Verifier in other ways. The command below uses the platform
+[Docker](https://docker.com) platform to run a local instance of Compliance Verifier
+compiled to the path `/path/to/verifier.war`,
+making it available at http://localhost:8080/verifier-docker.
+
+```
+docker run -it -p 8080:8080 tomcat:10.0.5-jdk15-adoptopenjdk-openj9 \
+  -v /path/to/verifier.war:/usr/local/tomcat/webapps/verifier-docker.war
+```
+
+Verifier dependencies are automatically obtained in its
+packaging process, and can be listed explicitly with the `mvn
+dependency:tree` command, or checked into `pom.xml` files. The Verifier accepts
+digitally signed files as its input, whether they have signatures attached, detached
+attached, detached or embedded signatures. As output, it produces PDF or
+HTML reports containing various information about their validity.
+
+To install Verifier, the process is dependent on the application server
+server chosen. In the case of Apache Tomcat, simply copy the WAR file to the web
+web applications folder of the application server (`$CATALINA_BASE/webapps`, where
+`$CATALINA_BASE` depends on the [installation method
+installation method](https://tomcat.apache.org/tomcat-10.0-doc/introduction.html) of
+Apache Tomcat).
+
+Information about the signature verification process is logged
+through the application server, for example in `$CATALINA_BASE/logs` in the case
+Apache Tomcat. Problems in the operation of the Verifier will be exposed
+These logs can be sent to the developers of the Reference
+Reference Code developers as it helps with possible fixes in the code base.
+
+The Verifier needs to download the artifacts used in the process of digital signature
+digital signature verification process through the HTTP, HTTPS
+and LDAP protocols. Therefore, communication through these protocols by the Verifier must not
+be prohibited by the operating system or other applications.
+
+##### Can Verifier verify signatures from other PCIs?
+
+No. The Conformance Verifier verifies signatures according to a set of trust anchors
+trust anchors, which are used to check the certification path of the
+path through the certificate extension [_Authority Information
+Access_](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.2.1). At
+ICP-Brasil, these anchors are the current certificates of the [Certification
+Certification Authority
+Roiz](https://www.gov.br/iti/pt-br/assuntos/repositorio/repositorio-ac-raiz)
+(Root CA). This set of anchors can be extended so that the Verifier
+Verifier to support signatures from other CCIs.
+
+This configuration is done in the Verifier's `web.xml` file. This file
+file is inside the `WEB-INF` folder at the location where the application server
+unzips the WAR file for execution. In the case of Apache Tomcat, the path
+is `$CATALINA_BASE/webapps/verifier-$VERSION/WEB-INF/web.xml`.
+
+In the `web.xml` file, two parameters are defined that relate to the
+anchors used during the execution of the Verifier:
+
+* the `trustAnchorsDirectory` parameter indicates in which directory the anchors will be
+  the anchors will be fetched from. The operating system user running the
+  Verifier application must have permission to read and write files in this
+  directory;
+* the `trustAnchorsURLs` parameter is given a comma-separated list of URLs
+  comma separated URLs from which the certificates will be retrieved and saved into the
+  directory specified above.
+
+To add new trust anchors, simply gather them in the directory
+directory specified by `trustAnchorsDirectory`, or add the desired URLs to the
+web.xml` file. On initialization of the Verifier, it will read the
+the files in the defined directory, and also download the certificates using the
+the URLs listed. After modifications to the `web.xml` file, the
+server needs to be restarted for the changes to take effect.
+
+By default, the directory specified
+is `/tmp/compliance-checker/Cache/trust-anchors/` and the URLs are from the
+URLs of the current ICP-Brasil Root Certificate Authorities. The two ways of
+obtained certificates can be used together or just one of them, depending
+of them, depending on what suits the situation best. The directory specified
+directory may not contain any certificates and all are obtained by downloading them
+from the URLs, or if a certificate is not available from the URL
+it can be added to the directory manually. More than one PCI can be
+accepted at the same time in one instance of the Verifier.
+
+##### Can the Verifier be used programmatically?
+
+The Conformance Checker exposes the `/startup`, `/webreport`, and `/report` endpoints for submission.
+and `/report` for submitting signatures via POST requests.
+
+* The `/start` _endpoint returns an initial JSON evaluation of the submitted
+  file, identifying whether it is verifiable by the application;
+* the _endpoint_ `/webreport` is used by the Verifier's web platform to
+  obtain the HTML signature reports;
+* the _endpoint_ `/report` can be used to obtain reports for
+  signature verification reports in XML or JSON programmatically.
+
+Details of the usage and responses of the _endpoints_ are in the
+[`IndexServlet.java`](reference-codes-core/src/main/java/br/ufsc/labsec/signature/conformanceVerifier/IndexServlet.java) class
+for `/startup`
+and [`SimpleServlet.java`](reference-code-core/src/main/java/br/ufsc/labsec/signature/conformanceVerifier/SimpleServlet.java)
+to `/report`.
+
+It is possible to restrict access from _endpoint_ `/report` by
+configuration of the `web.xml` file, as described in the
+[`SimpleServlet.java`] class (reference-codes-core/src/main/java/br/ufsc/labsec/signature/conformanceVerifier/SimpleServlet.java). Additionally,
+it is possible to make a configuration to limit requests to the _endpoint_
+`/webreport`, detailed in
+[`CompleteServlet.java`](reference-codes-core/src/main/java/br/ufsc/labsec/signature/conformanceVerifier/CompleteServlet.java). Translated with www.DeepL.com/Translator (free version)
+
+
 ##### O que são os Códigos de Referência?
 
 Os Códigos de Referência do Padrão Brasileiro de Assinatura Digital constituem
